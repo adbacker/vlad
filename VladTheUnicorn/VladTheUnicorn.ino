@@ -15,22 +15,21 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #include <ArduinoOTA.h>
 #include <SimpleTimer.h>
 
+//
+//const char *ssid = "key-guest";
+//const char *password = "917$L^sk";
 
-const char *ssid = "key-guest";
-const char *password = "917$L^sk";
-
-//const char* ssid = "aperture_science";
-//const char* password = "Abcd1234";
+const char* ssid = "aperture_science";
+const char* password = "Abcd1234";
 
 
 ESP8266WebServer server(80);
 
-bool vladState=0;
+bool vladIsOn=0;
 int secondsToRun=0;
 int CXNDELAY=10;
 int activatedCount=0;
 int secondsActive=0;
-bool vladSpeeding=false;
 String vladLcdString1;
 String vladLcdString2;
 
@@ -39,11 +38,13 @@ int led=LED_BUILTIN;
 int hornControl=12;
 uint16_t currentPixel=0;
 #define stripPixels 13
-#define PIN 5
+#define PIN 3
 Adafruit_NeoPixel strip = Adafruit_NeoPixel(stripPixels, PIN, NEO_GRB + NEO_KHZ800);
 SimpleTimer stripTimer;
+SimpleTimer displayTimer;
+
 int currentColor=0;
-int displayDelay=30;
+int displayDelay=40;
 int intensity=10;
 String wipeType="chase";
 
@@ -53,34 +54,27 @@ String myIp;
 String lcdLine1;
 String lcdLine2;
 
-void lightsOn() {
-  digitalWrite(led,LOW);
-  digitalWrite(hornControl,HIGH);
-}
 
-void lightsOff() {
-  digitalWrite(led,HIGH);
-  digitalWrite(hornControl,LOW);
-}
 
 
 void updateLcd() {
-  String vladStateMessage = "";
+  String vladIsOnMessage = "";
   printToLcd("","");
-  if (vladState) {
-    vladStateMessage = "Vlad ON: ";
-    vladStateMessage += String(secondsToRun);
-    vladStateMessage += " sec";
+  if (vladIsOn) {
+    vladIsOnMessage = "Vlad ON: ";
+    vladIsOnMessage += String(secondsToRun);
+    vladIsOnMessage += " sec";
   }
   else {
-    vladStateMessage="Vlad OFF";
+    vladIsOnMessage="Vlad OFF";
   }
-  printToLcd(myIp,vladStateMessage);
+  printToLcd(myIp,vladIsOnMessage);
 }
 
 void printToLcd(String line1, String line2) {
-
-  /*int line1Length=line1.length();
+  Serial.println(line1);
+  Serial.println(line2);
+  int line1Length=line1.length();
   int line2Length=line2.length();
 
   int line1Padding=16-line1.length();
@@ -104,14 +98,12 @@ void printToLcd(String line1, String line2) {
   lcd.print(line2Padded); // Start Print Test to Line 2
 
   lcdLine1=line1;
-  lcdLine2=line2;*/
+  lcdLine2=line2;
 }
 
 void printState() {
   String stateString = "<html><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><head style=\"font-size:36px\"><title>Vlad 3.0</title><p>VladServer 3.0</p><p style=\"font-size:24px\"><a href=\"http://" + myIp + "/\">reload page</a></p></head><body style=\"font-size:24px\"><p/><p/><p>vlad is currently: ";
-  if (vladSpeeding) {
-    stateString = stateString + " SpeedING ";
-  } else if (vladState) {
+  if (vladIsOn) {
     stateString = stateString + " ON for the next ";
     stateString = stateString + secondsToRun;
     stateString = stateString + " seconds ";
@@ -119,12 +111,25 @@ void printState() {
   else {
     stateString = stateString + " OFF ";
   }
-  stateString = stateString + "</p>To turn Vlad on: http://"+myIp+"/vladon?t=xxx where xxx is time in seconds (to a max of 120 sec)</p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/vladon?t=120\">activate Vlad's horn for 2 minutes</a></p>";
   stateString = stateString + "<p><a href=\"http://"+myIp+"/vladoff\">turn Vlad's horn off</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/Speed\">put Vlad to Speed</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/wakeup\">wake Vlad up</a></p>";
-  //stateString = stateString + getHistory();
+
+  stateString = stateString + "<hr>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=chase\">Horn chase mode LED</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=split\">Horn split mode LED</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=reversesplit\">Horn reverse split mode LED</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=lsd\">Horn LSD LED (dude....)</a></p>";
+  stateString = stateString + "<hr>";
+
+
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=10\">Horn intensity to mellow</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=30\">Horn intensity to medium</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=255\">Horn intensity to *** NUCLEAR*** </a></p>";
+  stateString = stateString + "<hr>";
+
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=40\">Horn speed to normal</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=20\">Horn speed to fast</a></p>";
+  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=10\">Horn speed to seizure</a></p>";
+
   stateString = stateString + "</body></html>";
   server.send(200, "text/html", stateString);
 }
@@ -140,37 +145,18 @@ void handleRoot() {
 }
 
 void handleOn() {
-//  if (vladSpeeding) {
-//    //don't do nothing
-//  } else {
-//    vladState = true;
-//    secondsToRun=server.arg(0).toInt();
-//    if (secondsToRun > 120) {
-//      secondsToRun=120;
-//    }
-//    //turn leds on
-//    lightsOn();
-//    activatedCount+=1;
-//  }
-//  printState();
-  displayDelay=server.arg(0).toInt();
-  if (displayDelay>100) {
-    displayDelay=100;
-  }
+  vladIsOn=true;
+  secondsToRun=8;
 }
 
 void handleOff() {
-  if (vladSpeeding) {
-    //do nothing
-  } else {
-    vladState = false;
-    lightsOff();
-    //turn leds off
-  }
-  printState();  
-}
+  vladIsOn=false;
+  colorWipe(strip.Color(0,0,0),(uint8_t)0);
 
+}
+    
 void handleSpeed() {
+  handleOn();  
   displayDelay=server.arg(0).toInt();
   if(displayDelay>150) {
     displayDelay=150;
@@ -178,6 +164,7 @@ void handleSpeed() {
   printState();
 }
 void handleIntensity() {
+  handleOn();
   intensity=server.arg(0).toInt();
   if (intensity>255) {
     intensity=255;
@@ -186,6 +173,7 @@ void handleIntensity() {
 }
 
 void handleWipe() {
+  handleOn();
   wipeType=server.arg(0);
   printState();
 }
@@ -194,7 +182,6 @@ void handleWipe() {
 
 void handleWake() {
   lcd.backlight();// Enable or Turn On the backlight 
-  vladSpeeding=false;
   printState();
 }
 
@@ -218,46 +205,35 @@ void handleNotFound(){
  * END web endpoint handlers
  * */
 
-void tick() {
+void displayTick() {
   if (secondsToRun > 0) {
     secondsToRun--;
-    secondsActive+=1;
   }
   if (secondsToRun<=0) {
     secondsToRun=0;
     handleOff();
   }
-  //updateLcd();
-}
-
-
-
-void flash(int flashNum) {
-  for (int i=0;i<flashNum;i++) {
-    lightsOn();
-    delay(500);
-    lightsOff();
-    delay(500);
-  }
+  updateLcd();
 }
 
 // Fill the dots one after the other with a color
 
 void hornDisplayStep() {
-  if(wipeType=="chase") {
-    colorWipeStep();
-  } else if (wipeType=="split") {
-    splitWipeStep();
-  } else if (wipeType=="reversesplit") {
-    reverseSplitWipeStep();
-  } else if (wipeType=="lsd") {
-    lsdWipeStep();
+  if (vladIsOn == true) {
+    if(wipeType=="chase") {
+      colorWipeStep();
+    } else if (wipeType=="split") {
+      splitWipeStep();
+    } else if (wipeType=="reversesplit") {
+      reverseSplitWipeStep();
+    } else if (wipeType=="lsd") {
+      lsdWipeStep();
+    }
+      else {
+      //do the default
+      colorWipeStep();
+    }
   }
-    else {
-    //do the default
-    colorWipeStep();
-  }
-  
 }
 
 void colorWipeStep() {
@@ -390,19 +366,15 @@ void reverseSplitWipe(uint32_t c, uint8_t wait) {
 }
 
 
-
 void setup(void){
-  vladState=0;
+  vladIsOn=0;
   lcd.begin(16,2);   // initializing the LCD
   lcd.init(); 
   lcd.backlight();// Enable or Turn On the backlight 
 
   pinMode(led, OUTPUT);
   pinMode(hornControl,OUTPUT);
-  lightsOff();
-  
-  flash(2);
-    
+      
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, password);
@@ -445,7 +417,7 @@ void setup(void){
   server.begin();
   Serial.println("HTTP server started");
   myIp=WiFi.localIP().toString();
-  flash(3);
+//  flash(3);
   
   /*
    * BEGIN Arduino Over-the-air update stuff
@@ -480,12 +452,14 @@ void setup(void){
   });
   ArduinoOTA.begin();
   printToLcd("OTA init","complete");
-  flash(4);
+//  flash(4);
   /*
   * END Arduino Over-the-air update stuff
   */
-
+//  lightsOn();
   stripTimer.setInterval(100L, hornDisplayStep);
+  displayTimer.setInterval(1000L,displayTick);
+  updateLcd();
 }
 
 
@@ -493,4 +467,5 @@ void loop(void){
   ArduinoOTA.handle();
   server.handleClient();
   stripTimer.run();
+  displayTimer.run();
 }
