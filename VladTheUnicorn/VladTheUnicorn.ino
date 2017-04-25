@@ -16,11 +16,11 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #include <SimpleTimer.h>
 
 //
-//const char *ssid = "key-guest";
-//const char *password = "917$L^sk";
+const char *ssid = "key-guest";
+const char *password = "917$L^sk";
 
-const char* ssid = "aperture_science";
-const char* password = "Abcd1234";
+//const char* ssid = "aperture_science";
+//const char* password = "Abcd1234";
 
 
 ESP8266WebServer server(80);
@@ -329,6 +329,21 @@ void lsdWipeStep() {
   //delay(displayDelay);
 }
 
+void fadeUp(int mswait) {
+    colorWipe(strip.Color(0,0,0),(uint8_t)0);
+    for (int i=0;i<255;i+=2) {
+        colorWipe(strip.Color(i,0,0),(uint8_t)0);
+        delay(mswait);
+    }
+}
+
+void fadeDown(int mswait) {
+    colorWipe(strip.Color(255,0,0),(uint8_t)0);
+    for (int i=255;i>0;i-=2) {
+        colorWipe(strip.Color(i,0,0),(uint8_t)0);
+        delay(mswait);
+    }
+}
 
 // Fill the dots one after the other with a color
 void colorWipe(uint32_t c, uint8_t wait) {
@@ -336,6 +351,16 @@ void colorWipe(uint32_t c, uint8_t wait) {
     strip.setPixelColor(i, c);
     strip.show();
     delay(wait);
+  }
+}
+
+void pulse(int pulses, int mswait) {
+  if (mswait > 3) {
+    mswait = 3; 
+  }
+  for (int i=0;i<pulses;i++) {
+    fadeUp(mswait);
+    fadeDown(mswait);
   }
 }
 
@@ -456,10 +481,10 @@ void setup(void){
   /*
   * END Arduino Over-the-air update stuff
   */
-//  lightsOn();
   stripTimer.setInterval(100L, hornDisplayStep);
   displayTimer.setInterval(1000L,displayTick);
   updateLcd();
+  pulse(3,1);
 }
 
 
