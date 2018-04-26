@@ -1,4 +1,7 @@
 #include <LiquidCrystal_I2C.h>
+
+
+
 LiquidCrystal_I2C lcd(0x27, 16, 2);
 
 #include <Adafruit_NeoPixel.h>
@@ -7,23 +10,15 @@ LiquidCrystal_I2C lcd(0x27, 16, 2);
 #endif
 
 
+
+#define BLYNK_PRINT Serial    // Comment this out to disable prints and save space
+#include <SPI.h>
 #include <ESP8266WiFi.h>
-#include <WiFiClient.h>
-#include <ESP8266WebServer.h>
-#include <ESP8266mDNS.h>
-#include <WiFiUdp.h>
-#include <ArduinoOTA.h>
+#include <BlynkSimpleEsp8266.h>
 #include <SimpleTimer.h>
 
-//
-const char *ssid = "key-guest";
-const char *password = "917$L^sk";
-
-//const char* ssid = "aperture_science";
-//const char* password = "Abcd1234";
-
-
-ESP8266WebServer server(80);
+//use simple timer events instead of running inside the loop()
+SimpleTimer timer;
 
 bool vladIsOn=0;
 int secondsToRun=0;
@@ -43,6 +38,13 @@ Adafruit_NeoPixel strip = Adafruit_NeoPixel(stripPixels, PIN, NEO_GRB + NEO_KHZ8
 SimpleTimer stripTimer;
 SimpleTimer displayTimer;
 
+char auth[] = "1b5a7a77f78945eeac0f402f3c45537a";
+#define WIFI_SSID "key-guest"
+#define WIFI_PW "917$L^sk"
+const int LED_PIN=4;
+
+
+
 int currentColor=0;
 int displayDelay=40;
 int intensity=10;
@@ -54,7 +56,17 @@ String myIp;
 String lcdLine1;
 String lcdLine2;
 
-
+BLYNK_WRITE(V1)
+{
+  //int pinValue = param.asInt(); // assigning incoming value from pin V1 to a variable
+  // You can also use:
+  String wipe = param.asStr();
+  // double d = param.asDouble();
+  Serial.print("wipe value is: ");
+  Serial.println(wipe);
+  handleOn();
+  wipeType=wipe;
+}
 
 
 void updateLcd() {
@@ -101,38 +113,38 @@ void printToLcd(String line1, String line2) {
   lcdLine2=line2;
 }
 
-void printState() {
-  String stateString = "<html><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><head style=\"font-size:36px\"><title>Vlad 3.0</title><p>VladServer 3.0</p><p style=\"font-size:24px\"><a href=\"http://" + myIp + "/\">reload page</a></p></head><body style=\"font-size:24px\"><p/><p/><p>vlad is currently: ";
-  if (vladIsOn) {
-    stateString = stateString + " ON for the next ";
-    stateString = stateString + secondsToRun;
-    stateString = stateString + " seconds ";
-  }
-  else {
-    stateString = stateString + " OFF ";
-  }
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/vladoff\">turn Vlad's horn off</a></p>";
-
-  stateString = stateString + "<hr>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=chase\">Horn chase mode LED</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=split\">Horn split mode LED</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=reversesplit\">Horn reverse split mode LED</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=lsd\">Horn LSD LED (dude....)</a></p>";
-  stateString = stateString + "<hr>";
-
-
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=10\">Horn intensity to mellow</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=30\">Horn intensity to medium</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=255\">Horn intensity to *** NUCLEAR*** </a></p>";
-  stateString = stateString + "<hr>";
-
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=40\">Horn speed to normal</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=20\">Horn speed to fast</a></p>";
-  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=10\">Horn speed to seizure</a></p>";
-
-  stateString = stateString + "</body></html>";
-  server.send(200, "text/html", stateString);
-}
+//void printState() {
+//  String stateString = "<html><meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><head style=\"font-size:36px\"><title>Vlad 3.0</title><p>VladServer 3.0</p><p style=\"font-size:24px\"><a href=\"http://" + myIp + "/\">reload page</a></p></head><body style=\"font-size:24px\"><p/><p/><p>vlad is currently: ";
+//  if (vladIsOn) {
+//    stateString = stateString + " ON for the next ";
+//    stateString = stateString + secondsToRun;
+//    stateString = stateString + " seconds ";
+//  }
+//  else {
+//    stateString = stateString + " OFF ";
+//  }
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/vladoff\">turn Vlad's horn off</a></p>";
+//
+//  stateString = stateString + "<hr>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=chase\">Horn chase mode LED</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=split\">Horn split mode LED</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=reversesplit\">Horn reverse split mode LED</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/wipe?t=lsd\">Horn LSD LED (dude....)</a></p>";
+//  stateString = stateString + "<hr>";
+//
+//
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=10\">Horn intensity to mellow</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=30\">Horn intensity to medium</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/intensity?t=255\">Horn intensity to *** NUCLEAR*** </a></p>";
+//  stateString = stateString + "<hr>";
+//
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=40\">Horn speed to normal</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=20\">Horn speed to fast</a></p>";
+//  stateString = stateString + "<p><a href=\"http://"+myIp+"/speed?t=10\">Horn speed to seizure</a></p>";
+//
+//  stateString = stateString + "</body></html>";
+//  server.send(200, "text/html", stateString);
+//}
 
 /*
  * 
@@ -140,9 +152,9 @@ void printState() {
  * 
  * */
 
-void handleRoot() {
-    printState();
-}
+//void handleRoot() {
+//    printState();
+//}
 
 void handleOn() {
   vladIsOn=true;
@@ -157,49 +169,49 @@ void handleOff() {
     
 void handleSpeed() {
   handleOn();  
-  displayDelay=server.arg(0).toInt();
+//  displayDelay=server.arg(0).toInt();
   if(displayDelay>150) {
     displayDelay=150;
   }
-  printState();
+  //printState();
 }
 void handleIntensity() {
   handleOn();
-  intensity=server.arg(0).toInt();
+ // intensity=server.arg(0).toInt();
   if (intensity>255) {
     intensity=255;
   }
-  printState();
+  //printState();
 }
 
 void handleWipe() {
   handleOn();
-  wipeType=server.arg(0);
-  printState();
+  //wipeType=server.arg(0);
+  //printState();
 }
 
 
 
 void handleWake() {
   lcd.backlight();// Enable or Turn On the backlight 
-  printState();
+  //printState();
 }
 
 
-void handleNotFound(){
-  String message = "No soup for you! (file not found).\n\n";
-  message += "URI: ";
-  message += server.uri();
-  message += "\nMethod: ";
-  message += (server.method() == HTTP_GET)?"GET":"POST";
-  message += "\nArguments: ";
-  message += server.args();
-  message += "\n";
-  for (uint8_t i=0; i<server.args(); i++){
-    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
-  }
-  server.send(404, "text/plain", message);
-}
+//void handleNotFound(){
+//  String message = "No soup for you! (file not found).\n\n";
+//  message += "URI: ";
+//  message += server.uri();
+//  message += "\nMethod: ";
+//  message += (server.method() == HTTP_GET)?"GET":"POST";
+//  message += "\nArguments: ";
+//  message += server.args();
+//  message += "\n";
+//  for (uint8_t i=0; i<server.args(); i++){
+//    message += " " + server.argName(i) + ": " + server.arg(i) + "\n";
+//  }
+//  server.send(404, "text/plain", message);
+//}
 
 /*
  * END web endpoint handlers
@@ -401,8 +413,8 @@ void setup(void){
   pinMode(hornControl,OUTPUT);
       
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
+//  WiFi.mode(WIFI_STA);
+//  WiFi.begin(ssid, password);
   Serial.println("");
 
   // Wait for connection
@@ -420,26 +432,26 @@ void setup(void){
   //  Serial.print(".");
   //  printToLcd("waiting....","connection....");
   //}
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(ssid);
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+//  Serial.println("");
+//  Serial.print("Connected to ");
+//  Serial.println(ssid);
+//  Serial.print("IP address: ");
+//  Serial.println(WiFi.localIP());
 
-  if (MDNS.begin("esp8266")) {
-    Serial.println("MDNS responder started");
-  }
+//  if (MDNS.begin("esp8266")) {
+//    Serial.println("MDNS responder started");
+//  }
 
-  server.on("/", handleRoot);
-  server.on("/vladon", handleOn);
-  server.on("/vladoff", handleOff);
-  server.on("/speed", handleSpeed);
-  server.on("/intensity", handleIntensity);
-  server.on("/wipe", handleWipe);
-  server.on("/wakeup", handleWake);
-  server.onNotFound(handleNotFound);
+//  server.on("/", handleRoot);
+//  server.on("/vladon", handleOn);
+//  server.on("/vladoff", handleOff);
+//  server.on("/speed", handleSpeed);
+//  server.on("/intensity", handleIntensity);
+//  server.on("/wipe", handleWipe);
+//  server.on("/wakeup", handleWake);
+//  server.onNotFound(handleNotFound);
 
-  server.begin();
+//  server.begin();
   Serial.println("HTTP server started");
   myIp=WiFi.localIP().toString();
 //  flash(3);
@@ -448,7 +460,7 @@ void setup(void){
    * BEGIN Arduino Over-the-air update stuff
    */
 
-   printToLcd("starting OTA","initialization");
+   //printToLcd("starting OTA","initialization");
    // Port defaults to 8266
   // ArduinoOTA.setPort(8266);
  
@@ -456,31 +468,33 @@ void setup(void){
   //ArduinoOTA.setHostname("vladTheImpaler");
 
   // No authentication by default
-  ArduinoOTA.setPassword((const char *)"Abcd1234");
-
-  ArduinoOTA.onStart([]() {
-    Serial.println("Start");
-  });
-  ArduinoOTA.onEnd([]() {
-    Serial.println("End");
-  });
-  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-    Serial.printf("Progress: %u%%\n", (progress / (total / 100)));
-  });
-  ArduinoOTA.onError([](ota_error_t error) {
-    Serial.printf("Error[%u]: ", error);
-    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
-    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
-    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
-    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
-    else if (error == OTA_END_ERROR) Serial.println("End Failed");
-  });
-  ArduinoOTA.begin();
-  printToLcd("OTA init","complete");
+//  ArduinoOTA.setPassword((const char *)"Abcd1234");
+//
+//  ArduinoOTA.onStart([]() {
+//    Serial.println("Start");
+//  });
+//  ArduinoOTA.onEnd([]() {
+//    Serial.println("End");
+//  });
+//  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+//    Serial.printf("Progress: %u%%\n", (progress / (total / 100)));
+//  });
+//  ArduinoOTA.onError([](ota_error_t error) {
+//    Serial.printf("Error[%u]: ", error);
+//    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+//    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+//    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+//    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+//    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+//  });
+//  ArduinoOTA.begin();
+//  printToLcd("OTA init","complete");
 //  flash(4);
   /*
   * END Arduino Over-the-air update stuff
   */
+    Blynk.begin(auth, WIFI_SSID, WIFI_PW);
+
   stripTimer.setInterval(100L, hornDisplayStep);
   displayTimer.setInterval(1000L,displayTick);
   updateLcd();
@@ -489,8 +503,9 @@ void setup(void){
 
 
 void loop(void){
-  ArduinoOTA.handle();
-  server.handleClient();
+//  ArduinoOTA.handle();
+//  server.handleClient();
+  Blynk.run(); // Initiates Blynk
   stripTimer.run();
   displayTimer.run();
 }
