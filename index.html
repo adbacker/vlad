@@ -1,21 +1,30 @@
 <html>
-<head></head>
+<head>
+</head>
 <body>
 
-<p>Hello World!</p>
-<p>Vlad The Unicorn v3.0 coming soon!</p>
-<p><a href='http://blynk-cloud.com/1b5a7a77f78945eeac0f402f3c45537a/update/V3?value=chase'>led chase</a>
-</p>
-<p>
-<a href='http://blynk-cloud.com/1b5a7a77f78945eeac0f402f3c45537a/update/V3?value=split'>split wipe</a>
-</p>
-<p>
-<a href='http://blynk-cloud.com/1b5a7a77f78945eeac0f402f3c45537a/update/V3?value=reversesplit'>reverse Split wipe</a>
-</p>
-<p>
-<a href='http://blynk-cloud.com/1b5a7a77f78945eeac0f402f3c45537a/update/V3?value=lsd'>leds on lsd</a>
-</p>
 
+<h1>Vlad The Unicorn v3.0</h1>
+
+<p>now with light up hornyness!</p>
+<button type="button>" onclick="setWipe('chase')">chase</button>
+<button type="button>" onclick="setWipe('split')">split wipe</button>
+<button type="button>" onclick="setWipe('reversesplit')">reverse split wipe</button>
+<button type="button>" onclick="setWipe('lsd')">led lsd</button>
+
+
+
+<script type="text/javascript" language="javascript">
+
+function setWipe(wipeType) {
+    var http = new XMLHttpRequest();
+    var postUrl = "http://blynk-cloud.com/1b5a7a77f78945eeac0f402f3c45537a/update/V3?value=" + wipeType;
+    http.open("GET",postUrl, true);
+    //http.setRequestHeader("Content-type", "application/json");
+    http.send();
+}
+
+</script>
 
 </body>
 
